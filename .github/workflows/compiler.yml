@@ -1,10 +1,10 @@
 name: Automated Secure Binary Compiler
 
 on:
-  schedule:
-    # Triggers automatically every 2 hours to rotate the internal timestamp
-    - cron: '0 */2 * * *'
-  workflow_dispatch: # Allows you to trigger the compilation manually anytime
+  push:
+    paths:
+      - 'payload.enc'
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
