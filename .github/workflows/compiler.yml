@@ -1,4 +1,4 @@
-name: Decrypt and compile Python bytecode
+name: Compile Python bytecode for multiple versions
 
 on:
   push:
@@ -17,63 +17,91 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  compile:
+  decrypt:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out destination repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Decrypt and compile main.py
+      - name: Decrypt main.py
         shell: bash
         env:
           AES_KEY: ${{ secrets.DECRYPT_KEY }}
         run: |
           set -euo pipefail
-
           if [[ -z "${AES_KEY:-}" ]]; then
-            echo "::error::Missing Actions secret DECRYPT_KEY"
+            echo "::error::Missing DECRYPT_KEY secret"
             exit 1
           fi
-
           if [[ ! -s main.py ]]; then
-            echo "::error::Encrypted main.py is missing or empty"
+            echo "::error::main.py missing or empty"
             exit 1
           fi
-
-          DECRYPTED_SOURCE="$(mktemp "$RUNNER_TEMP/decrypted_main.XXXXXX.py")"
-          trap 'rm -f "$DECRYPTED_SOURCE"' EXIT
-
           openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -a \
-            -in main.py \
-            -out "$DECRYPTED_SOURCE" \
-            -pass env:AES_KEY
+            -in main.py -out decrypted.py -pass env:AES_KEY
+          test -s decrypted.py
 
-          if [[ ! -s "$DECRYPTED_SOURCE" ]]; then
-            echo "::error::Decryption produced an empty file"
-            exit 1
-          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: decrypted-source
+          path: decrypted.py
 
-          python -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="main.pyc", dfile="main.py", doraise=True)' "$DECRYPTED_SOURCE"
-          test -s main.pyc
-          echo "Successfully compiled main.pyc"
+  compile:
+    needs: decrypt
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Publish main.pyc
+      - uses: actions/download-artifact@v4
+        with:
+          name: decrypted-source
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=$(echo "${{ matrix.python-version }}" | tr -d '.')
+          python -c "import py_compile,sys; py_compile.compile(sys.argv[1], cfile='main-py$TAG.pyc', dfile='main.py', doraise=True)" decrypted.py
+          test -s "main-py$TAG.pyc"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pyc-${{ matrix.python-version }}
+          path: main-py*.pyc
+
+  publish:
+    needs: [decrypt, compile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: decrypted-source
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pyc-*
+          merge-multiple: true
+
+      - name: Publish
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f main.pyc
-
+          mv decrypted.py main-plain.py
+          git add -f main-plain.py main-py*.pyc
           if git diff --cached --quiet; then
-            echo 'main.pyc is unchanged; nothing to commit.'
+            echo 'No changes to commit.'
             exit 0
           fi
-
-          git commit -m 'Build main.pyc from encrypted main.py'
+          git commit -m 'Build multi-version main-py*.pyc and main-plain.py'
           git push origin "HEAD:${GITHUB_REF_NAME}"
