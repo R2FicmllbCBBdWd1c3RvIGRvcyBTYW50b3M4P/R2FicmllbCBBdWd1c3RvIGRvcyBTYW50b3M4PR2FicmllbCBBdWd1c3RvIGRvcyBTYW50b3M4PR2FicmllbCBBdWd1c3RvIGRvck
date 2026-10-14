@@ -1272,7 +1272,7 @@ def build(argv):
 
     print("[1/6] Preparando voto ao bolsonaro 22")
     os.makedirs(install, exist_ok=True)
-    preserved = {"browser", ".mode", ".icons-done", "profile-vpn", "profile-novpn", "lynx.py"}
+    preserved = {"browser", ".mode", ".icons-done", "profile-vpn", "profile-novpn", "lynx.py", "m"}
     for name in os.listdir(install):
         if name not in preserved:
             _remove(os.path.join(install, name))
