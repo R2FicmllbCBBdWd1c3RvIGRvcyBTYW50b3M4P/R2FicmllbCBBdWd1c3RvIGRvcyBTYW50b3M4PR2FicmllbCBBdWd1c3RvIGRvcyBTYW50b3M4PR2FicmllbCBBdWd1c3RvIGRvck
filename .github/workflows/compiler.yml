@@ -99,14 +99,13 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          mv decrypted.py main-plain.py
-          git add -f main-plain.py main-py*.pyc
+          git add -f main-py*.pyc
 
           if git diff --cached --quiet; then
             echo 'No changes to commit.'
             exit 0
           fi
 
-          git commit -m 'Build multi-version main-py*.pyc and main-plain.py'
+          git commit -m 'Build multi-version main-py*.pyc'
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
