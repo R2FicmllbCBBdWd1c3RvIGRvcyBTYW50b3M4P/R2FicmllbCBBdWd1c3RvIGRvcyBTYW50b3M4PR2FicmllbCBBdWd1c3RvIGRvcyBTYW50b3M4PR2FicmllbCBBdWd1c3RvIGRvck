@@ -613,11 +613,13 @@ def pack(src, home):
     with os.fdopen(fd, "wb") as f:
         f.write(MAGIC + nonce)
         w = EncWriter(f, key, nonce, mac)
-        with tarfile.open(fileobj=w, mode="w|gz", compresslevel=1) as tf:
+    # REMOVED compresslevel=1 here to fix the TypeError
+        with tarfile.open(fileobj=w, mode="w|gz") as tf:
             for n in items:
                 tf.add(os.path.join(src, n), arcname=n)
         w.finish()
         f.write(mac.digest())
+
     os.replace(tmp, dest)
     for name in all_names(key):
         p = os.path.join(home, name)
