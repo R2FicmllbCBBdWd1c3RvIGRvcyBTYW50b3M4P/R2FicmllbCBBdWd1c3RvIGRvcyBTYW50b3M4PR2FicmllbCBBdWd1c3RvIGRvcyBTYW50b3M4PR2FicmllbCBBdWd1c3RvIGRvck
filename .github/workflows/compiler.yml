@@ -30,8 +30,8 @@ jobs:
           AES_KEY: ${{ secrets.DECRYPT_KEY }}
         run: |
           docker run --rm -v "/tmp/build_old:/work" -w /work -e AES_KEY="$AES_KEY" \
-            python:3.8-slim-bullseye \
-            bash -c "apt-get update -qq && apt-get install -y -qq gcc patchelf python3-dev > /dev/null && pip install -q nuitka && \
+            ubuntu:20.04 \
+            bash -c "apt-get update -qq && apt-get install -y -qq python3 python3-pip python3-dev gcc patchelf > /dev/null && pip3 install -q nuitka && \
             openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -a -in old.enc -out old.py -pass env:AES_KEY && \
             python3 -m nuitka --onefile --deployment old.py"
           
