@@ -3,7 +3,7 @@ import base64, errno, fcntl, hashlib, hmac, http.server, json, os, re, secrets
 import shutil, signal, socket, subprocess, sys, tarfile, tempfile, threading, time
 import urllib.parse, urllib.request, webbrowser, shlex, requests
 from pathlib import Path
-
+#
 def check_debuggers():
     if sys.gettrace() is not None:
         sys.exit(1)
@@ -53,111 +53,6 @@ FIREFOX_URL = "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux
 # FIX 3: --rgb-blue adicionado como var dedicada para rgba() dinâmico via JS
 # FIX 1+2: applyTheme() e fetchTheme() definidos no primeiro bloco de script;
 #           lynxSaveEmail chama fetchTheme() que agora existe e atualiza as vars CSS
-
-PAINEL_TEMPLATE = r'''<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel - Lynx</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0a0a0c;--panel:#101013;--line:#1e1e24;--text:#e8e8ea;--dim:#8a8a94;--accent:#3b82f6;--accent-2:#60a5fa}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;height:100vh;display:flex;flex-direction:column}
-header{height:60px;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid var(--line);justify-content:space-between}
-.btn{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 16px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:13px;transition:.2s}
-.btn:hover{background:#1a1a20}
-.main{flex:1;display:flex;padding:32px;gap:32px;overflow:hidden;max-width:1200px;margin:0 auto;width:100%}
-.col{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
-h2{font-size:18px;font-family:'Sora',sans-serif;margin-bottom:8px}
-.themes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.swatch{padding:12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:.2s}
-.swatch:hover{border-color:var(--accent)}
-.wp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:12px}
-.wp-item{aspect-ratio:16/9;border-radius:8px;background-size:cover;background-position:center;position:relative;border:2px solid transparent;cursor:pointer}
-.wp-item.selected{border-color:var(--accent)}
-.wp-del{position:absolute;top:4px;right:4px;background:rgba(224,82,82,.8);color:#fff;border:none;border-radius:4px;width:20px;height:20px;cursor:pointer}
-.upload-box{border:2px dashed var(--line);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:.2s}
-.upload-box:hover{border-color:var(--accent);background:rgba(59,130,246,.05)}
-</style>
-</head>
-<body>
-<header>
-  <h2>Painel de Controle</h2>
-  <a href="/" class="btn">Voltar ao Início</a>
-</header>
-<div class="main">
-  <div class="col">
-    <h2>Cores do Tema</h2>
-    <div class="themes" id="themes"></div>
-  </div>
-  <div class="col">
-    <h2>Wallpapers Salvos</h2>
-    <div class="wp-grid" id="wp-grid"></div>
-    <div class="upload-box" onclick="document.getElementById('file').click()">
-      <p>+ Adicionar novo Wallpaper</p>
-      <input type="file" id="file" accept="image/*" style="display:none" onchange="handleUpload(event)">
-    </div>
-  </div>
-</div>
-<script>
-let mods = { theme: 'azul', wallpapers: [], active_wallpaper: null };
-const THEMES = { azul: '#3b82f6', roxo: '#8b5cf6', verde: '#10b981', vermelho: '#ef4444' };
-
-async function loadMods() {
-  const r = await fetch('/api/mods'); const d = await r.json();
-  if(d.ok) { mods = d.mods; render(); }
-}
-function render() {
-  const tDiv = document.getElementById('themes'); tDiv.innerHTML = '';
-  Object.keys(THEMES).forEach(k => {
-    const el = document.createElement('div'); el.className = 'swatch';
-    el.style.borderColor = mods.theme === k ? THEMES[k] : 'var(--line)';
-    el.innerHTML = `<div style="width:16px;height:16px;border-radius:50%;background:${THEMES[k]}"></div>${k}`;
-    el.onclick = () => { mods.theme = k; save(); render(); };
-    tDiv.appendChild(el);
-  });
-  const wDiv = document.getElementById('wp-grid'); wDiv.innerHTML = '';
-  if(mods.wallpapers.length === 0) wDiv.innerHTML = '<p style="color:var(--dim);font-size:13px;grid-column:1/-1">Nenhum salvo.</p>';
-  mods.wallpapers.forEach(w => {
-    const el = document.createElement('div'); el.className = 'wp-item' + (mods.active_wallpaper === w.id ? ' selected' : '');
-    el.style.backgroundImage = `url(${w.data})`;
-    el.onclick = (e) => { if(e.target.tagName !== 'BUTTON') { mods.active_wallpaper = w.id; save(); render(); } };
-    const btn = document.createElement('button'); btn.className = 'wp-del'; btn.innerHTML = '×';
-    btn.onclick = (e) => { e.stopPropagation(); mods.wallpapers = mods.wallpapers.filter(x => x.id !== w.id); if(mods.active_wallpaper === w.id) mods.active_wallpaper = null; save(); render(); };
-    el.appendChild(btn); wDiv.appendChild(el);
-  });
-}
-async function save() {
-  await fetch('/api/save_mods', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(mods) });
-}
-function handleUpload(e) {
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 1920; let w = img.width, h = img.height;
-      if (w > MAX_WIDTH) { h = Math.round(h * MAX_WIDTH / w); w = MAX_WIDTH; }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      // Converte qualquer imagem (webp, bmp, etc) para JPEG para garantir compatibilidade e tamanho
-      const data = canvas.toDataURL('image/jpeg', 0.8);
-      mods.wallpapers.push({ id: Date.now().toString(), name: file.name, data: data });
-      if(!mods.active_wallpaper) mods.active_wallpaper = mods.wallpapers[mods.wallpapers.length-1].id;
-      save(); render();
-    };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-loadMods();
-</script>
-</body>
-</html>'''
-
 HOME_TEMPLATE = r'''<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -559,9 +454,6 @@ document.querySelectorAll("[data-url]").forEach(function (el) {
 """
     write_text(os.path.join(config_dir, "web-vpn", "index.html"), v)
     write_text(os.path.join(config_dir, "web-vpn", "home.js"), js)
-
-    write_text(novpn.replace("index.html", "painel.html"), PAINEL_TEMPLATE)
-    write_text(os.path.join(config_dir, "web-vpn", "painel.html"), PAINEL_TEMPLATE)
 
 # ── vault ─────────────────────────────────────────────────────────────────────
 
@@ -980,105 +872,43 @@ setInterval(tick,400);tick();
 choice = {"mode": None}
 choice_evt = threading.Event()
 
-class Handler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *a, **k):
-            super().__init__(*a, directory=web, **k)
+class Handler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
 
-        def log_message(self, *a):
-            pass
+    def do_GET(self):
+        if self.path.startswith("/progress"):
+            body, ctype = json.dumps(state).encode(), "application/json"
+        elif self.path.startswith("/logo.png"):
+            with open(os.path.join(CFG, "icons", "lynx-logo.png"), "rb") as f:
+                body, ctype = f.read(), "image/png"
+        elif self.path.startswith("/bolso.png"):
+            with open(os.path.join(CFG, "icons", "bolso.png"), "rb") as f:
+                body, ctype = f.read(), "image/png"
+        else:
+            body, ctype = PAGE.encode("utf-8"), "text/html; charset=utf-8"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
-        def end_headers(self):
-            self.send_header("Cache-Control", "no-store")
-            super().end_headers()
-
-        def _send_json(self, data, code=200):
-            body = json.dumps(data).encode()
-            self.send_response(code)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _serve_home(self):
-            src = os.path.join(web, "index.html")
-            try:
-                with open(src, encoding="utf-8") as f:
-                    html = f.read()
-            except OSError:
-                return super().do_GET()
-            em = _read_email()
-            th = _fetch_theme(em)
-            html = _inject_theme(html, th)
-            body = html.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_GET(self):
-            if self.path in ("/", "/index.html"):
-                return self._serve_home()
-            
-            if self.path == "/painel":
-                try:
-                    with open(os.path.join(web, "painel.html"), encoding="utf-8") as f:
-                        body = f.read().encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
-                except OSError:
-                    self.send_error(404)
-                return
-
-            if self.path.startswith("/email"):
-                em = _read_email()
-                th = _fetch_theme(em)
-                return self._send_json({"email": em, "theme": th})
-
-            if self.path.startswith("/api/mods"):
-                em = _read_email()
-                if not em: return self._send_json({"ok": False, "error": "no_email"})
-                try:
-                    r = requests.post("https://lynx-gate.mamaetata216.workers.dev/", json={"action": "getMods", "email": em})
-                    return self._send_json(r.json())
-                except Exception as e:
-                    return self._send_json({"ok": False, "error": str(e)})
-
-            return super().do_GET()
-
-        def do_POST(self):
-            if self.path == "/save-email":
-                try:
-                    length = int(self.headers.get("Content-Length", "0") or "0")
-                    raw = self.rfile.read(length).decode("utf-8")
-                    data = json.loads(raw)
-                    em = str(data.get("email", "")).strip().lower()
-                    if "@" in em:
-                        write_text(os.path.join(base, ".email"), em + "\n")
-                        _theme_cache.pop(em, None)
-                        return self._send_json({"ok": True, "email": em})
-                    else:
-                        return self._send_json({"ok": False})
-                except Exception as e:
-                    return self._send_json({"ok": False, "error": str(e)})
-            
-            if self.path == "/api/save_mods":
-                try:
-                    em = _read_email()
-                    if not em: return self._send_json({"ok": False, "error": "no_email"})
-                    length = int(self.headers.get("Content-Length", "0") or "0")
-                    mods_data = json.loads(self.rfile.read(length).decode("utf-8"))
-                    r = requests.post("https://lynx-gate.mamaetata216.workers.dev/", json={"action": "saveMods", "email": em, "mods": mods_data})
-                    return self._send_json(r.json())
-                except Exception as e:
-                    return self._send_json({"ok": False, "error": str(e)})
-
-            self.send_response(404)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
+    def do_POST(self):
+        ok = False
+        if self.path.startswith("/choose") and state["stage"] == "choose":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            mode = q.get("mode", [""])[0]
+            if mode in ("vpn", "novpn") and choice["mode"] is None:
+                choice["mode"] = mode
+                choice_evt.set()
+                ok = True
+        body = json.dumps({"ok": ok}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 def setup_log(message):
     path = os.path.join(tempfile.gettempdir(), "lynx-setup-%s.log" % os.getuid())
