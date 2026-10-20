@@ -23,7 +23,7 @@ jobs:
         run: |
           docker run --rm -v "${{ github.workspace }}:/work" -w /work \
             androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.9 \
-            python3 -m nuitka --onefile --deployment --strip --enable-plugin=anti-bloat --python-flag=no_site --python-flag=no_docstrings --output-filename=old.pyc old.py
+            python3 -m nuitka --onefile --deployment --output-filename=old.pyc old.py
           test -s old.pyc
 
       - name: Upload old binary
@@ -45,7 +45,7 @@ jobs:
         run: |
           docker run --rm -v "${{ github.workspace }}:/work" -w /work \
             androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.13 \
-            python3 -m nuitka --onefile --deployment --strip --enable-plugin=anti-bloat --python-flag=no_site --python-flag=no_docstrings --output-filename=newest.pyc newest.py
+            python3 -m nuitka --onefile --deployment --output-filename=newest.pyc newest.py
           test -s newest.pyc
 
       - name: Upload newest binary
