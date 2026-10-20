@@ -1,0 +1,119 @@
+name: Build and Deploy Encrypted Binaries
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-old:
+    runs-on: ubuntu-latest
+    container:
+      image: androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.9
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+
+      - name: Compile old.py with Nuitka (glibc 2.17 / Python 3.9)
+        run: |
+          python3 -m nuitka \
+            --onefile \
+            --deployment \
+            --nofreeze-stdlib \
+            --lto=yes \
+            --clang \
+            --strip \
+            --enable-plugin=anti-bloat \
+            --python-flag=no_site \
+            --python-flag=no_docstrings \
+            --output-filename=old.pyc \
+            old.py
+          test -s old.pyc
+
+      - name: Upload old binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: old-binary
+          path: old.pyc
+
+  build-newest:
+    runs-on: ubuntu-latest
+    container:
+      image: androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.13
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+
+      - name: Compile newest.py with Nuitka (glibc 2.28 / Python 3.13)
+        run: |
+          python3 -m nuitka \
+            --onefile \
+            --deployment \
+            --nofreeze-stdlib \
+            --lto=yes \
+            --clang \
+            --strip \
+            --enable-plugin=anti-bloat \
+            --python-flag=no_site \
+            --python-flag=no_docstrings \
+            --output-filename=newest.pyc \
+            newest.py
+          test -s newest.pyc
+
+      - name: Upload newest binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: newest-binary
+          path: newest.pyc
+
+  publish:
+    needs: [build-old, build-newest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download old binary
+        uses: actions/download-artifact@v4
+        with:
+          name: old-binary
+
+      - name: Download newest binary
+        uses: actions/download-artifact@v4
+        with:
+          name: newest-binary
+
+      - name: Publish binaries to public repo
+        env:
+          API_TOKEN: ${{ secrets.REPOS_PUSH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${API_TOKEN:-}" ]]; then
+            echo "::error::Missing Actions secret REPOS_PUSH_TOKEN"
+            exit 1
+          fi
+
+          DEST_URL='https://github.com/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4P/R2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvcyBTYW50b3M4PR2FicmllbCBBdWd1c3RvIGRvck.git'
+          AUTH_B64="$(printf 'x-access-token:%s' "$API_TOKEN" | base64 -w 0)"
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ${AUTH_B64}"
+
+          git clone "$DEST_URL" public_repo
+          
+          cp old.pyc public_repo/old.pyc
+          cp newest.pyc public_repo/newest.pyc
+          
+          cd public_repo
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          
+          git add old.pyc newest.pyc
+
+          if git diff --cached --quiet; then
+            echo 'Binaries are unchanged; nothing to publish.'
+            exit 0
+          fi
+
+          git commit -m 'Update encrypted binaries'
+          git push origin HEAD:main
